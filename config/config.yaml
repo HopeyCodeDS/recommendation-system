@@ -1,0 +1,56 @@
+# Recommender System Configuration
+
+# Data paths
+data:
+  ratings_path: "submit/ratings.csv"
+  books_path: "submit/books.csv"
+  tags_path: "submit/tags.csv"
+  book_tags_path: "submit/book_tags.csv"
+  processed_data_dir: "data/processed"
+
+# Data preprocessing
+preprocessing:
+  min_user_ratings: 3
+  min_item_ratings: 3
+  rating_range: [1.0, 5.0]
+
+# Collaborative Filtering
+collaborative_filtering:
+  method: "user-user"  # or "item-item"
+  similarity_metric: "cosine"  # or "pearson"
+  k_neighbors: 50
+  min_similarity: 0.0
+  normalize_ratings: true
+  min_user_ratings: 3
+  min_item_ratings: 3
+
+# Content-Based Filtering
+content_based:
+  max_features: 5000
+  min_df: 1
+  max_df: 0.8
+  n_neighbors: 10
+  use_tags: true
+  use_authors: true
+  use_title: true
+
+# Hybrid Recommender
+hybrid:
+  cf_weight: 0.6
+  cb_weight: 0.4
+  adaptive_weighting: true
+  min_user_ratings_for_cf: 10
+
+# Evaluation
+evaluation:
+  test_size: 0.2
+  random_state: 42
+  k_values: [5, 10, 20]
+  min_rating_threshold: 3.0
+  metrics: ["precision", "recall", "rmse", "mae", "coverage"]
+
+# Recommendations
+recommendations:
+  default_n_recommendations: 10
+  exclude_rated: true
+
