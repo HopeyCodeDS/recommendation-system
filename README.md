@@ -32,8 +32,8 @@ Recommender_Systems/
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd Recommender_Systems
+git clone https://github.com/HopeyCodeDS/recommendation-system.git
+cd recommender-systems
 ```
 
 2. Install dependencies:
@@ -228,19 +228,3 @@ hybrid.fit(ratings_df, books_df)
 - Precomputes similarity matrices for faster recommendations
 - Configurable filtering to reduce data sparsity
 - Supports incremental updates (similarity matrices can be cached)
-
-## Contributing
-
-1. Follow the existing code structure
-2. Add unit tests for new features
-3. Update documentation
-4. Ensure code passes linting
-
-## License
-
-[Your License Here]
-
-## Acknowledgments
-
-This project implements standard recommender system algorithms and best practices from the research literature.
-
