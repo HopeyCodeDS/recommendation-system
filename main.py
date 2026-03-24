@@ -160,10 +160,24 @@ def main():
     if args.user_id:
         print(f"\nTraining {args.type} recommender...")
         recommender = train_recommender(args.type, config, processed_ratings, processed_books)
-        
-        print(f"\nGetting recommendations for user {args.user_id}...")
+
+        target_user_id = args.user_id
+        if 'user_id' in processed_ratings.columns and not processed_ratings.empty:
+            user_dtype = processed_ratings['user_id'].dtype
+            try:
+                if pd.api.types.is_integer_dtype(user_dtype):
+                    target_user_id = int(args.user_id)
+                elif pd.api.types.is_float_dtype(user_dtype):
+                    target_user_id = float(args.user_id)
+                else:
+                    target_user_id = str(args.user_id)
+            except ValueError:
+                print(f"Invalid --user-id '{args.user_id}' for dtype {user_dtype}")
+                return
+            
+        print(f"\nGetting recommendations for user {target_user_id}...")
         recommendations = recommender.recommend(
-            args.user_id,
+            target_user_id,
             n_recommendations=args.n_recommendations
         )
         
