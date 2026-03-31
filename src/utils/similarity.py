@@ -48,40 +48,45 @@ def cosine_similarity_sparse(matrix: Union[np.ndarray, csr_matrix],
         return cosine_similarity(matrix, matrix)
 
 
-def pearson_correlation(matrix: np.ndarray, 
+def pearson_correlation(matrix: np.ndarray,
                        min_common_items: int = 1) -> np.ndarray:
     """
     Compute Pearson correlation similarity matrix.
-    
+
     Parameters:
     -----------
     matrix : np.ndarray
         Input matrix (users x items)
     min_common_items : int
         Minimum number of common items required for similarity computation
-        
+
     Returns:
     --------
     np.ndarray
         Correlation similarity matrix
     """
-    # Mean-center each row (user)
-    mean_centered = matrix - matrix.mean(axis=1, keepdims=True)
-    
-    # Compute correlation
-    std = np.std(mean_centered, axis=1, keepdims=True)
-    std[std == 0] = 1  # Avoid division by zero
-    
-    normalized = mean_centered / std
-    
-    # Compute correlation matrix
-    correlation = np.dot(normalized, normalized.T) / matrix.shape[1]
-    
-    # Set correlations to 0 where there are too few common items
-    # This is a simplified check - in practice, you'd check actual common items
-    common_items = np.dot((matrix != 0).astype(int), (matrix != 0).T.astype(int))
+    rated_mask = (matrix != 0).astype(float)
+
+    # Mean-center each row using only rated (non-zero) items
+    rated_counts = rated_mask.sum(axis=1, keepdims=True)
+    rated_counts[rated_counts == 0] = 1  # Avoid division by zero
+    user_means = (matrix * rated_mask).sum(axis=1, keepdims=True) / rated_counts
+
+    # Zero-out unrated entries after mean-centering so they don't contribute
+    mean_centered = np.where(rated_mask, matrix - user_means, 0.0)
+
+    # L2-normalize each row so dot product gives cosine of mean-centered vectors
+    norms = np.sqrt((mean_centered ** 2).sum(axis=1, keepdims=True))
+    norms[norms == 0] = 1  # Avoid division by zero
+    normalized = mean_centered / norms
+
+    # Correlation matrix
+    correlation = np.dot(normalized, normalized.T)
+
+    # Zero out pairs with fewer than min_common_items rated items in common
+    common_items = np.dot(rated_mask, rated_mask.T)
     correlation[common_items < min_common_items] = 0
-    
+
     return correlation
 
 
