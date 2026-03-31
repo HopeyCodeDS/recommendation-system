@@ -245,43 +245,32 @@ class HybridRecommender(BaseRecommender):
         # Combine recommendations
         combined_scores = {}
         
-        # Add CF recommendations
-        for rec in cf_recommendations:
-            item_id = rec['item_id']
-            score = rec.get('predicted_rating', 3.0) * cf_w
-            confidence = rec.get('confidence', 0.5) * cf_w
-            
-            if item_id not in combined_scores:
-                combined_scores[item_id] = {
-                    'item_id': item_id,
-                    'score': 0.0,
-                    'confidence': 0.0,
-                    'cf_score': 0.0,
-                    'cb_score': 0.0
-                }
-            
-            combined_scores[item_id]['score'] += score
-            combined_scores[item_id]['confidence'] += confidence
-            combined_scores[item_id]['cf_score'] = rec.get('predicted_rating', 3.0)
-        
-        # Add CB recommendations
-        for rec in cb_recommendations:
-            item_id = rec['item_id']
-            score = rec.get('predicted_rating', 3.0) * cb_w
-            confidence = rec.get('confidence', 0.5) * cb_w
-            
-            if item_id not in combined_scores:
-                combined_scores[item_id] = {
-                    'item_id': item_id,
-                    'score': 0.0,
-                    'confidence': 0.0,
-                    'cf_score': 0.0,
-                    'cb_score': 0.0
-                }
-            
-            combined_scores[item_id]['score'] += score
-            combined_scores[item_id]['confidence'] += confidence
-            combined_scores[item_id]['cb_score'] = rec.get('predicted_rating', 3.0)
+        # Index each list by item_id for O(1) lookup when combining
+        cf_by_item = {rec['item_id']: rec for rec in cf_recommendations}
+        cb_by_item = {rec['item_id']: rec for rec in cb_recommendations}
+        all_item_ids = set(cf_by_item) | set(cb_by_item)
+
+        # Neutral fallback score used when an item appears in only one source.
+        # Using 3.0 (mid-scale) prevents a systematic bias against items that
+        # only one recommender knows about.
+        NEUTRAL = 3.0
+
+        for item_id in all_item_ids:
+            cf_rec = cf_by_item.get(item_id)
+            cb_rec = cb_by_item.get(item_id)
+
+            cf_score = cf_rec['predicted_rating'] if cf_rec else NEUTRAL
+            cb_score = cb_rec['predicted_rating'] if cb_rec else NEUTRAL
+            cf_conf = cf_rec.get('confidence', 0.5) if cf_rec else 0.3
+            cb_conf = cb_rec.get('confidence', 0.5) if cb_rec else 0.3
+
+            combined_scores[item_id] = {
+                'item_id': item_id,
+                'score': cf_w * cf_score + cb_w * cb_score,
+                'confidence': min(1.0, cf_w * cf_conf + cb_w * cb_conf),
+                'cf_score': cf_score,
+                'cb_score': cb_score,
+            }
         
         # Convert to list and sort
         recommendations = []
