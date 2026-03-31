@@ -4,7 +4,6 @@ Evaluation metrics for recommender systems
 
 import numpy as np
 from typing import List, Set, Dict
-import pandas as pd
 
 
 def precision_at_k(recommended_items: List[str],
@@ -310,12 +309,15 @@ def ndcg_at_k(recommended_items: List[str],
                 relevance = 1.0
             dcg += relevance / np.log2(i + 1)
     
-    # Compute IDCG (ideal DCG)
-    ideal_relevance = sorted([
-        item_scores.get(item, 1.0) if item_scores else 1.0
-        for item in top_k if item in relevant_items
-    ], reverse=True)
-    
+    # Compute IDCG (ideal DCG): assume best-case ranking of ALL relevant items, up to k positions
+    if item_scores:
+        ideal_relevance = sorted(
+            [item_scores.get(item, 1.0) for item in relevant_items],
+            reverse=True
+        )[:k]
+    else:
+        ideal_relevance = [1.0] * min(len(relevant_items), k)
+
     idcg = sum(rel / np.log2(i + 2) for i, rel in enumerate(ideal_relevance))
     
     if idcg == 0:
