@@ -58,6 +58,7 @@ class ContentBasedRecommender(BaseRecommender):
         
         # Model state
         self.books_df = None
+        self.ratings_df = None
         self.tfidf_vectorizer = None
         self.tfidf_matrix = None
         self.knn_model = None
@@ -115,7 +116,8 @@ class ContentBasedRecommender(BaseRecommender):
             books_df = books_df[books_df['title'].isin(unique_items)]
         
         self.books_df = books_df.copy()
-        
+        self.ratings_df = ratings_df.copy()
+
         # Create content string
         self._create_content_features()
         
@@ -176,38 +178,66 @@ class ContentBasedRecommender(BaseRecommender):
     
     def predict(self, user_id: str, item_id: str) -> float:
         """
-        Predict rating for a user-item pair.
-        For content-based, we return similarity-based score.
-        
+        Predict rating for a user-item pair using content similarity.
+
+        Computes the cosine similarity between the target item's TF-IDF vector
+        and each item the user has already rated, then returns a similarity-
+        weighted average of those ratings.
+
         Parameters:
         -----------
         user_id : str
-            User identifier (not used in content-based, but required by interface)
+            User identifier
         item_id : str
             Item identifier
-            
+
         Returns:
         --------
         float
-            Predicted rating (based on content similarity to user's rated items)
+            Predicted rating on the 1-5 scale
         """
         if not self.is_fitted:
             raise ValueError("Model must be fitted before prediction")
-        
+
         if item_id not in self.item_mapping:
-            # Return default rating for unknown items
             return 3.0
-        
-        # For content-based, we need user's rating history to make meaningful predictions
-        # This is a simplified version - in practice, you'd use user's rated items
-        # For now, return average rating if available, else 3.0
-        if self.books_df is not None and 'average_rating' in self.books_df.columns:
-            item_idx = self.item_mapping[item_id]
-            avg_rating = self.books_df.iloc[item_idx]['average_rating']
-            if pd.notna(avg_rating):
-                return float(avg_rating)
-        
-        return 3.0
+
+        # Look up user's rated items and their ratings
+        if self.ratings_df is None:
+            return 3.0
+
+        user_rows = self.ratings_df[self.ratings_df['user_id'] == user_id]
+        if user_rows.empty:
+            return 3.0
+
+        item_col = self.item_col
+        rated_items = user_rows[item_col].tolist()
+        rated_ratings = user_rows['rating'].tolist()
+
+        # Keep only items present in the content model
+        valid = [(iid, r) for iid, r in zip(rated_items, rated_ratings) if iid in self.item_mapping]
+        if not valid:
+            return 3.0
+
+        valid_items, valid_ratings = zip(*valid)
+
+        # TF-IDF vector for the target item
+        target_idx = self.item_mapping[item_id]
+        target_vec = self.tfidf_matrix[target_idx]
+
+        # TF-IDF matrix for the user's rated items
+        rated_indices = [self.item_mapping[iid] for iid in valid_items]
+        rated_matrix = self.tfidf_matrix[rated_indices]
+
+        # Cosine similarities between target and each rated item
+        sims = cosine_similarity(target_vec, rated_matrix).flatten()
+
+        total_sim = np.sum(np.abs(sims))
+        if total_sim == 0:
+            return float(np.mean(valid_ratings))
+
+        prediction = float(np.dot(sims, np.array(valid_ratings)) / total_sim)
+        return float(np.clip(prediction, 1.0, 5.0))
     
     def recommend(self, user_id: str, n_recommendations: int = 10,
                  exclude_rated: bool = True,
