@@ -10,7 +10,7 @@ from typing import List, Dict, Optional, Literal
 import warnings
 
 from .base_recommender import BaseRecommender
-from ..utils.similarity import cosine_similarity_sparse, apply_similarity_threshold, normalize_similarity_matrix
+from ..utils.similarity import cosine_similarity_sparse, apply_similarity_threshold
 from ..utils.preprocessing import normalize_ratings, create_user_item_matrix
 
 
@@ -157,10 +157,7 @@ class CollaborativeFilter(BaseRecommender):
                 self.similarity_matrix,
                 threshold=self.min_similarity
             )
-        
-        # Normalize
-        self.similarity_matrix = normalize_similarity_matrix(self.similarity_matrix)
-    
+
     def _compute_item_similarity(self):
         """Compute item-item similarity matrix."""
         # Transpose matrix for item-item similarity
@@ -179,9 +176,6 @@ class CollaborativeFilter(BaseRecommender):
                 self.similarity_matrix,
                 threshold=self.min_similarity
             )
-        
-        # Normalize
-        self.similarity_matrix = normalize_similarity_matrix(self.similarity_matrix)
     
     def predict(self, user_id: str, item_id: str) -> float:
         """
@@ -258,20 +252,14 @@ class CollaborativeFilter(BaseRecommender):
         similar_users_ratings = similar_users_ratings[mask]
         similar_users_sims = similar_users_sims[mask]
         
-        # Weighted average
-        if self.normalize_ratings_flag:
-            # Add back means for similar users
-            similar_user_ids = [self.reverse_user_mapping[idx] for idx in top_k_indices[mask]]
-            similar_user_means = np.array([self.user_means.get(uid, 0) for uid in similar_user_ids])
-            similar_users_ratings = similar_users_ratings + similar_user_means
-        
-        # Compute weighted prediction
+        # Compute weighted prediction (neighbor ratings are already normalized;
+        # adding neighbor means here would double-count when we add target user mean below)
         if np.sum(np.abs(similar_users_sims)) > 0:
             prediction = np.sum(similar_users_ratings * similar_users_sims) / np.sum(np.abs(similar_users_sims))
         else:
             prediction = self.user_means.get(user_id, self.global_mean)
-        
-        # Add user mean if normalized
+
+        # Add target user mean once to de-normalize
         if self.normalize_ratings_flag:
             prediction = prediction + self.user_means[user_id]
         
@@ -320,20 +308,14 @@ class CollaborativeFilter(BaseRecommender):
         similar_items_ratings = similar_items_ratings[mask]
         similar_items_sims = similar_items_sims[mask]
         
-        # Weighted average
-        if self.normalize_ratings_flag:
-            # Add back item means
-            similar_item_ids = [self.reverse_item_mapping[idx] for idx in top_k_indices[mask]]
-            similar_item_means = np.array([self.item_means.get(iid, 0) for iid in similar_item_ids])
-            similar_items_ratings = similar_items_ratings + similar_item_means
-        
-        # Compute weighted prediction
+        # Compute weighted prediction (neighbor ratings are already normalized;
+        # adding item means here would double-count when we add target item mean below)
         if np.sum(np.abs(similar_items_sims)) > 0:
             prediction = np.sum(similar_items_ratings * similar_items_sims) / np.sum(np.abs(similar_items_sims))
         else:
             prediction = self.item_means.get(item_id, self.global_mean)
-        
-        # Add item mean if normalized
+
+        # Add target item mean once to de-normalize
         if self.normalize_ratings_flag:
             prediction = prediction + self.item_means[item_id]
         
